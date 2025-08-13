@@ -36,23 +36,26 @@ We also ask that authors emphasize the real-world impact of the methods, specifi
 4. Post-process field boundaries
 - filter by land cover map (`ftw inference filter_by_lulc`)
 - polygonize and smooth/filter by size (`ftw inference polygonize`)
+
+5. Zonal stats
   
-5. Create embeddings for fields
-- MOSAIKS
-- AlphaEarth Foundations?
-- Presto?
+6. Create embeddings for fields
+- AlphaEarth Foundations (from HuggingFace catalog? or ask Cholmes to do it for our area?)
+- MOSAIKS (have to choose time range)
+- Presto (have to choose time range)
   
-6. Crop type classification of field boundaries (USA)
+7. Crop type classification of field boundaries (USA)
 - Caleb's demo and/or Hannah's notebook
 - would be nice if we had an example for another country than the US
   
-7. Deforestation mapping (Brazil or somewhere in Latin America?)
+8. Deforestation mapping (Brazil or somewhere in Latin America?)
 - pair with GLAD deforestation map
+- Hannah will send example area with deforestation
   
-8. Change detection
+9. Change detection
 - visualize changes in embeddings?
   
-9. Clustering?? what else can we get "for free"
+10. Clustering?? what else can we get "for free"
 
 ### Tell us how you used this tutorial
 Some sort of google form or message board where we can track the use cases people are doing with it + benefits of having made it?
