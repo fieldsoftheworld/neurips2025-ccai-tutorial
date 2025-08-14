@@ -1,1 +1,4 @@
 pystac-client == 0.9.0
+torchgeo < 0.8  # torchgeo>=0.8 will introduce breaking changes into the ftw inference scripts
+scikit-learn
+mgrs

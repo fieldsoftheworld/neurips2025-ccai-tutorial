@@ -149,10 +149,6 @@ def get_best_image_ids(
     return win_a_id, win_b_id
 
 
-s2grid_url = "https://sentiwiki.copernicus.eu/__attachments/1692737/S2A_OPER_GIP_TILPAR_MPC__20151209T095117_V20150622T000000_21000101T000000_B00.zip?inst-v=affad40c-471a-4024-9c0f-5b675004aa50"
-
-s2grid = gpd.read_file(s2grid_url, layer="Features")
-
 """Download crop calendar files into ./data if they don't exist."""
 crop_calendar_files = {
     "summer": {"start": "sc_sos_3x3_v2.tiff", "end": "sc_eos_3x3_v2.tiff"},
