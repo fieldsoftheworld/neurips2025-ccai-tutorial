@@ -1,0 +1,1 @@
+pystac-client == 0.9.0
