@@ -6,6 +6,7 @@ from rasterio.transform import rowcol
 from datetime import datetime, timedelta
 import pystac_client
 import planetary_computer
+import math
 
 CDL_CODE_TO_NAME = {
     0: "Background",
@@ -143,6 +144,51 @@ CDL_CODE_TO_NAME = {
     250: "Cranberries",
     254: "Dbl Crop Barley/Soybeans",
 }
+
+
+def granule_codes_from_bbox(lat_min, lat_max, lon_min, lon_max):
+    # Handle antimeridian by splitting if needed
+    if lon_min <= lon_max:
+        lon_ranges = [(lon_min, lon_max)]
+    else:
+        lon_ranges = [(lon_min, 180.0), (-180.0, lon_max)]
+
+    granules = set()
+    for lomin, lomax in lon_ranges:
+        lat_start = int(math.ceil(lat_min / 10.0) * 10)
+        lat_end   = int(math.ceil(lat_max / 10.0) * 10)
+        lon_start = int(math.floor(lomin  / 10.0) * 10)
+        lon_end   = int(math.floor(lomax  / 10.0) * 10)
+
+        for lat_tl in range(lat_start, lat_end + 1, 10):
+            for lon_tl in range(lon_start, lon_end + 1, 10):
+                lat_hemi = 'N' if lat_tl >= 0 else 'S'
+                lon_hemi = 'E' if lon_tl >= 0 else 'W'
+                lat_str = f"{abs(lat_tl):02d}{lat_hemi}"
+                lon_str = f"{abs(lon_tl):03d}{lon_hemi}"
+                granules.add((lat_str, lon_str))
+    return sorted(granules)
+
+
+def download_glad_granule(filename, layer="lossyear",
+                               version="GFC-2024-v1.12"):
+    base_url = f"https://storage.googleapis.com/earthenginepartners-hansen/{version}/"
+    try:
+        url = base_url + filename
+        urllib.request.urlretrieve(url, 'data/' + filename)
+    except Exception as e:
+        print(f"Failed to download {url}: {str(e)}")
+        return False 
+
+
+def hansen_filenames_from_bbox(lat_min, lat_max, lon_min, lon_max,
+                               layer="lossyear",
+                               version="GFC-2024-v1.12"):
+    out = []
+    for lat_str, lon_str in granule_codes_from_bbox(lat_min, lat_max, lon_min, lon_max):
+        fname = f"Hansen_{version}_{layer}_{lat_str}_{lon_str}.tif"
+        out.append(fname)
+    return out
 
 
 def calculate_window_dates(sos_date, eos_date):
