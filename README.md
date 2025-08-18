@@ -20,40 +20,40 @@ We also ask that authors emphasize the real-world impact of the methods, specifi
 - Remote sensing people?
 - Machine learning practitioners for agriculture use cases?
 - Supply chain people?
-- Should we tell the story as one of these people? e.g. "Suppose you are a ___ wanting to ___..."
+- Should we tell the story as one of these people? e.g. "Suppose you are a \__ wanting to\__..."
 
 ### Outline
 1. Choose an ROI and TOI
-- [bbox finder](https://bboxfinder.com/#0.000000,0.000000,0.000000,0.000000)?
-- admin1 or admin2 dropdown?
-- the ROI needs to be <1 Sentinel-2 tile - select an MGRS tile?
+    - [bbox finder](https://bboxfinder.com/#0.000000,0.000000,0.000000,0.000000)?
+    - admin1 or admin2 dropdown?
+    - the ROI needs to be <1 Sentinel-2 tile - select an MGRS tile?
 
 2. Download Sentinel-2 images for window A and window B (using crop calendar-based auto selection)
    
 4. Predict field boundaries
-- `ftw inference run`
+    - `ftw inference run`
   
 4. Post-process field boundaries
-- filter by land cover map (`ftw inference filter_by_lulc`)
-- polygonize and smooth/filter by size (`ftw inference polygonize`)
+    - filter by land cover map (`ftw inference filter_by_lulc`)
+    - polygonize and smooth/filter by size (`ftw inference polygonize`)
 
 5. Zonal stats
   
 6. Create embeddings for fields
-- AlphaEarth Foundations (from HuggingFace catalog? or ask Cholmes to do it for our area?)
-- MOSAIKS (have to choose time range)
-- Presto (have to choose time range)
+    - AlphaEarth Foundations (from HuggingFace catalog? or ask Cholmes to do it for our  area?)
+    - MOSAIKS (have to choose time range)
+    - Presto (have to choose time range)
   
 7. Crop type classification of field boundaries (USA)
-- Caleb's demo and/or Hannah's notebook
-- would be nice if we had an example for another country than the US
+    - Caleb's demo and/or Hannah's notebook
+    - would be nice if we had an example for another country than the US
   
 8. Deforestation mapping (Brazil or somewhere in Latin America?)
-- pair with GLAD deforestation map
-- Hannah will send example area with deforestation
+    - pair with GLAD deforestation map
+    - Hannah will send example area with deforestation
   
 9. Change detection
-- visualize changes in embeddings?
+    - visualize changes in embeddings?
   
 10. Clustering?? what else can we get "for free"
 

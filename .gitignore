@@ -1,0 +1,9 @@
+.ipynb_checkpoints/
+__pycache__/
+data/
+*.pyc
+*.tif
+*.tiff
+*.gpkg
+*.zip
+*.ckpt
