@@ -13,6 +13,10 @@ from ipyleaflet import GeoJSON
 from IPython.display import display, HTML
 from rasterio.transform import rowcol
 from shapely.geometry import Point 
+import torch
+import torch.nn.functional as F
+from torchgeo.models import RCF
+
 
 CDL_CODE_TO_NAME = {
     0: "Background",
@@ -440,3 +444,34 @@ def pick_mgrs_tile(tile_id):
 def get_selected_tile_id():
     """Helper function to get the currently selected tile ID"""
     return selected_tile_id
+
+class RCFWithCustomMaskPooling(RCF):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def forward_masked(self, x: torch.Tensor, mask: torch.Tensor) -> torch.Tensor:
+        """WARNING: This method doesn't work on batches of images, only on single images."""
+
+        assert x.dim() == 3, "Input tensor must have 3 dimensions (C, H, W)"
+        x1a = F.relu(
+            F.conv2d(x, self.weights, bias=self.biases, stride=1, padding=0),
+            inplace=True,
+        )
+        x1b = F.relu(
+            -F.conv2d(x, self.weights, bias=self.biases, stride=1, padding=0),
+            inplace=False,
+        )
+        padding = self.weights.shape[-1] // 2
+        mask = mask[padding:-padding, padding:-padding]
+
+        x1a = torch.mean(x1a[:, mask], dim=1, keepdim=False)
+        x1b = torch.mean(x1b[:, mask], dim=1, keepdim=False)
+        output = torch.cat((x1a, x1b), dim=0)
+        return output
+
+
+"""Download crop calendar files into ./data if they don't exist."""
+crop_calendar_files = {
+    "summer": {"start": "sc_sos_3x3_v2.tiff", "end": "sc_eos_3x3_v2.tiff"},
+    "winter": {"start": "wc_sos_3x3_v2.tiff", "end": "wc_eos_3x3_v2.tiff"},
+}
