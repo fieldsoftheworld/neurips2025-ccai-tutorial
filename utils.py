@@ -10,9 +10,9 @@ import planetary_computer
 import pystac_client
 import rasterio
 from ipyleaflet import GeoJSON
-from IPython.display import display
+from IPython.display import display, HTML
 from rasterio.transform import rowcol
-from shapely.geometry import Point, shape
+from shapely.geometry import Point 
 
 CDL_CODE_TO_NAME = {
     0: "Background",
@@ -282,7 +282,7 @@ def download_crop_calendars(crop_calendar_dir="./"):
     return True
 
 
-def get_best_image_ids(
+def get_best_images(
     win_a_start, win_a_end, win_b_start, win_b_end, s2_tile_id, max_cloud_cover=20
 ):
     catalog = pystac_client.Client.open(
@@ -318,30 +318,49 @@ def get_best_image_ids(
         print(
             f"Found image from {best_item.datetime.date()} with {cloud_cover}% cloud coverage"
         )
-        return best_item.id
+        return best_item
 
     cloud_thresholds = [max_cloud_cover, 50, 70, 100]
-    win_a_id = None
-    win_b_id = None
+    win_a = None
+    win_b = None
 
     for threshold in cloud_thresholds:
-        if win_a_id is None:
-            win_a_id = find_best_image(win_a_start, win_a_end, threshold, s2_tile_id)
-        if win_b_id is None:
-            win_b_id = find_best_image(win_b_start, win_b_end, threshold, s2_tile_id)
-        if win_a_id is not None and win_b_id is not None:
+        if win_a is None:
+            win_a = find_best_image(win_a_start, win_a_end, threshold, s2_tile_id)
+        if win_b is None:
+            win_b = find_best_image(win_b_start, win_b_end, threshold, s2_tile_id)
+        if win_a is not None and win_b is not None:
             break
 
-    if win_a_id is None:
+    if win_a is None:
         raise ValueError(
             f"Could not find suitable images for window A ({win_a_start} to {win_a_end}) even with 100% cloud cover"
         )
-    if win_b_id is None:
+    if win_b is None:
         raise ValueError(
             f"Could not find suitable images for window B ({win_b_start} to {win_b_end}) even with 100% cloud cover"
         )
 
-    return win_a_id, win_b_id
+    return win_a, win_b
+
+
+def show_previews(a, b):
+    href_a = a.assets["rendered_preview"].href
+    href_b = b.assets["rendered_preview"].href
+
+    return display(HTML(f"""
+        <div style="display: flex; gap: 5%">
+            <div width="50%">
+                <h4>Window A</h4>
+                <img src="{href_a}" style="max-width: 100%; max-height: 50vh" />
+            </div>
+            <div width="50%">
+                <h4>Window B</h4>
+                <img src="{href_b}" style="max-width: 100%; max-height: 50vh" />
+            </div>
+        </div>
+    """))
+
 
 ### MGRS Tile Selector
 
