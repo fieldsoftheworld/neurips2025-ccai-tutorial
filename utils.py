@@ -1,12 +1,18 @@
-import urllib.request
-from shapely.geometry import Point
-import os
-import rasterio
-from rasterio.transform import rowcol
-from datetime import datetime, timedelta
-import pystac_client
-import planetary_computer
+import json
 import math
+import os
+import urllib.request
+from datetime import datetime, timedelta
+
+import ipywidgets as widgets
+import leafmap
+import planetary_computer
+import pystac_client
+import rasterio
+from ipyleaflet import GeoJSON
+from IPython.display import display, HTML
+from rasterio.transform import rowcol
+from shapely.geometry import Point 
 
 CDL_CODE_TO_NAME = {
     0: "Background",
@@ -146,6 +152,13 @@ CDL_CODE_TO_NAME = {
 }
 
 
+"""Download crop calendar files into ./data if they don't exist."""
+crop_calendar_files = {
+    "summer": {"start": "sc_sos_3x3_v2.tiff", "end": "sc_eos_3x3_v2.tiff"},
+    "winter": {"start": "wc_sos_3x3_v2.tiff", "end": "wc_eos_3x3_v2.tiff"},
+}
+
+
 def granule_codes_from_bbox(lat_min, lat_max, lon_min, lon_max):
     # Handle antimeridian by splitting if needed
     if lon_min <= lon_max:
@@ -269,7 +282,7 @@ def download_crop_calendars(crop_calendar_dir="./"):
     return True
 
 
-def get_best_image_ids(
+def get_best_images(
     win_a_start, win_a_end, win_b_start, win_b_end, s2_tile_id, max_cloud_cover=20
 ):
     catalog = pystac_client.Client.open(
@@ -305,37 +318,125 @@ def get_best_image_ids(
         print(
             f"Found image from {best_item.datetime.date()} with {cloud_cover}% cloud coverage"
         )
-        return best_item.id
+        return best_item
 
     cloud_thresholds = [max_cloud_cover, 50, 70, 100]
-    win_a_id = None
-    win_b_id = None
+    win_a = None
+    win_b = None
 
     for threshold in cloud_thresholds:
-        if win_a_id is None:
-            win_a_id = find_best_image(win_a_start, win_a_end, threshold, s2_tile_id)
-        if win_b_id is None:
-            win_b_id = find_best_image(win_b_start, win_b_end, threshold, s2_tile_id)
-        if win_a_id is not None and win_b_id is not None:
+        if win_a is None:
+            win_a = find_best_image(win_a_start, win_a_end, threshold, s2_tile_id)
+        if win_b is None:
+            win_b = find_best_image(win_b_start, win_b_end, threshold, s2_tile_id)
+        if win_a is not None and win_b is not None:
             break
 
-    if win_a_id is None:
+    if win_a is None:
         raise ValueError(
             f"Could not find suitable images for window A ({win_a_start} to {win_a_end}) even with 100% cloud cover"
         )
-    if win_b_id is None:
+    if win_b is None:
         raise ValueError(
             f"Could not find suitable images for window B ({win_b_start} to {win_b_end}) even with 100% cloud cover"
         )
 
-    return win_a_id, win_b_id
+    return win_a, win_b
 
 
-"""Download crop calendar files into ./data if they don't exist."""
-crop_calendar_files = {
-    "summer": {"start": "sc_sos_3x3_v2.tiff", "end": "sc_eos_3x3_v2.tiff"},
-    "winter": {"start": "wc_sos_3x3_v2.tiff", "end": "wc_eos_3x3_v2.tiff"},
-}
+def show_previews(a, b):
+    href_a = a.assets["rendered_preview"].href
+    href_b = b.assets["rendered_preview"].href
 
-download_crop_calendars()
+    return display(HTML(f"""
+        <div style="display: flex; gap: 5%">
+            <div width="50%">
+                <h4>Window A</h4>
+                <img src="{href_a}" style="max-width: 100%; max-height: 50vh" />
+            </div>
+            <div width="50%">
+                <h4>Window B</h4>
+                <img src="{href_b}" style="max-width: 100%; max-height: 50vh" />
+            </div>
+        </div>
+    """))
 
+
+### MGRS Tile Selector
+
+selected_grid_layer = None
+selected_tile_id = None  # Module-level variable to store selected tile
+
+def get_tile_id(ft):
+    return ft.get("properties", {}).get("Name")
+
+def pick_mgrs_tile(tile_id):
+    with open('s2-grid.json') as f:
+        geojson = json.load(f)
+
+    features = geojson.get("features", [])
+    feature_map = {}
+    for ft in features:
+        tid = get_tile_id(ft)
+        feature_map[tid] = ft
+
+    m = leafmap.Map(center=(0, 0), zoom=1, draw_control=False, measure_control=False)
+
+    # Base layer: the whole grid (light style, hover emphasis)
+    grid_layer = GeoJSON(
+        data=geojson,
+        style={"color": "#666666", "weight": 0.25, "fillOpacity": 0.05},
+        hover_style={"weight": 2, "fillOpacity": 0.10},
+        name="MGRS Tiles",
+    )
+    m.add_layer(grid_layer)
+
+    status = widgets.HTML("<b>Click a tile to select its MGRS ID.</b>")
+    display(status)
+    display(m)
+
+    def highlight_tile(fid):
+        global selected_grid_layer
+        """Replace the highlight layer with the selected feature."""
+        # Remove old highlight
+        if selected_grid_layer is not None:
+            try:
+                m.remove_layer(selected_grid_layer)
+            except Exception:
+                pass
+            selected_grid_layer = None
+
+        if fid not in feature_map:
+            return
+
+        # Create a single-feature GeoJSON for the highlight
+        selected_grid_layer = GeoJSON(
+            data=feature_map[fid],
+            style={"color": "#ff0000", "weight": 3, "fillOpacity": 0.15},
+            name="Selected Tile",
+        )
+        m.add_layer(selected_grid_layer)
+
+    def select_tile(fid):
+        global selected_tile_id
+        selected_tile_id = fid
+        highlight_tile(fid)
+        status.value = f"<b>Selected tile:</b> <code>{fid}</code>"
+
+    # ----------------------------
+    # Feature click handler
+    # ----------------------------
+    def on_grid_click(**kwargs):
+        # ipyleaflet passes a dict with 'feature' and 'coordinates'
+        ft = kwargs.get("feature") or {}
+        fid = get_tile_id(ft)
+        select_tile(fid)
+
+    grid_layer.on_click(on_grid_click)
+
+    if tile_id:
+        select_tile(tile_id)
+
+def get_selected_tile_id():
+    """Helper function to get the currently selected tile ID"""
+    return selected_tile_id
