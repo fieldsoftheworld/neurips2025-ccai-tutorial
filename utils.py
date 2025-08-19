@@ -1,12 +1,18 @@
-import urllib.request
-from shapely.geometry import Point
-import os
-import rasterio
-from rasterio.transform import rowcol
-from datetime import datetime, timedelta
-import pystac_client
-import planetary_computer
+import json
 import math
+import os
+import urllib.request
+from datetime import datetime, timedelta
+
+import ipywidgets as widgets
+import leafmap
+import planetary_computer
+import pystac_client
+import rasterio
+from ipyleaflet import GeoJSON
+from IPython.display import display
+from rasterio.transform import rowcol
+from shapely.geometry import Point, shape
 
 CDL_CODE_TO_NAME = {
     0: "Background",
@@ -143,6 +149,13 @@ CDL_CODE_TO_NAME = {
     249: "Gourds",
     250: "Cranberries",
     254: "Dbl Crop Barley/Soybeans",
+}
+
+
+"""Download crop calendar files into ./data if they don't exist."""
+crop_calendar_files = {
+    "summer": {"start": "sc_sos_3x3_v2.tiff", "end": "sc_eos_3x3_v2.tiff"},
+    "winter": {"start": "wc_sos_3x3_v2.tiff", "end": "wc_eos_3x3_v2.tiff"},
 }
 
 
@@ -330,12 +343,81 @@ def get_best_image_ids(
 
     return win_a_id, win_b_id
 
+### MGRS Tile Selector
 
-"""Download crop calendar files into ./data if they don't exist."""
-crop_calendar_files = {
-    "summer": {"start": "sc_sos_3x3_v2.tiff", "end": "sc_eos_3x3_v2.tiff"},
-    "winter": {"start": "wc_sos_3x3_v2.tiff", "end": "wc_eos_3x3_v2.tiff"},
-}
+selected_grid_layer = None
+selected_tile_id = None  # Module-level variable to store selected tile
 
-download_crop_calendars()
+def get_tile_id(ft):
+    return ft.get("properties", {}).get("Name")
 
+def pick_mgrs_tile(tile_id):
+    with open('s2-grid.json') as f:
+        geojson = json.load(f)
+
+    features = geojson.get("features", [])
+    feature_map = {}
+    for ft in features:
+        tid = get_tile_id(ft)
+        feature_map[tid] = ft
+
+    m = leafmap.Map(center=(0, 0), zoom=1, draw_control=False, measure_control=False)
+
+    # Base layer: the whole grid (light style, hover emphasis)
+    grid_layer = GeoJSON(
+        data=geojson,
+        style={"color": "#666666", "weight": 0.25, "fillOpacity": 0.05},
+        hover_style={"weight": 2, "fillOpacity": 0.10},
+        name="MGRS Tiles",
+    )
+    m.add_layer(grid_layer)
+
+    status = widgets.HTML("<b>Click a tile to select its MGRS ID.</b>")
+    display(status)
+    display(m)
+
+    def highlight_tile(fid):
+        global selected_grid_layer
+        """Replace the highlight layer with the selected feature."""
+        # Remove old highlight
+        if selected_grid_layer is not None:
+            try:
+                m.remove_layer(selected_grid_layer)
+            except Exception:
+                pass
+            selected_grid_layer = None
+
+        if fid not in feature_map:
+            return
+
+        # Create a single-feature GeoJSON for the highlight
+        selected_grid_layer = GeoJSON(
+            data=feature_map[fid],
+            style={"color": "#ff0000", "weight": 3, "fillOpacity": 0.15},
+            name="Selected Tile",
+        )
+        m.add_layer(selected_grid_layer)
+
+    def select_tile(fid):
+        global selected_tile_id
+        selected_tile_id = fid
+        highlight_tile(fid)
+        status.value = f"<b>Selected tile:</b> <code>{fid}</code>"
+
+    # ----------------------------
+    # Feature click handler
+    # ----------------------------
+    def on_grid_click(**kwargs):
+        # ipyleaflet passes a dict with 'feature' and 'coordinates'
+        ft = kwargs.get("feature") or {}
+        fid = get_tile_id(ft)
+        select_tile(fid)
+
+    grid_layer.on_click(on_grid_click)
+
+    if tile_id:
+        select_tile(tile_id)
+
+def get_selected_tile_id():
+    """Helper function to get the currently selected tile ID"""
+    return selected_tile_id
