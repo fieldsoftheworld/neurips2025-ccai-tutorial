@@ -23,14 +23,20 @@ jobs:
       with:
         auto-update-conda: true
         python-version: ${{ matrix.python-version }}
-        miniforge-variant: Mambaforge
-        use-mamba: true
+
+    - name: Initialize conda
+      shell: bash -l {0}
+      run: |
+        conda init bash
+        conda --version
+        conda info
 
     - name: Create conda environment from env.yml
       shell: bash -l {0}
       run: |
         conda env create -f env.yml
         conda activate ftw-tutorial
+        conda info --envs
 
     - name: Install pip requirements
       shell: bash -l {0}
