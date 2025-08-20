@@ -64,6 +64,8 @@ jobs:
 
     - name: Verify installation
       shell: bash -l {0}
+      env:
+        KMP_DUPLICATE_LIB_OK: TRUE
       run: |
         conda activate ftw-tutorial
         python --version
