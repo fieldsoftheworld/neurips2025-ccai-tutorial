@@ -65,7 +65,7 @@ Some sort of google form or message board where we can track the use cases peopl
 - [CCAI Tutorial Guidelines](https://docs.google.com/document/d/1Yb_L_yasBnzxuRPHe3FiGaChk3BgQ8UVSHGt-75F_OA/edit?tab=t.0)
 
 ## Tutorial fodder
-- Gedeon’s inference [colab notebook](https://colab.research.google.com/drive/1Cd7bGK6ysFzAxtChkBcyciGJpp5OfQ3V?authuser=1#scrollTo=ac0MsK22Icux)
+- Gedeon’s inference notebook [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1nQdUWEmX79XjWiPTUCUoYUNH3fsQjwmu?usp=sharing)
 - Nathan’s stuff from in person sprint
     - Trying to understand issues with AWS and Planetary Computer imagery: https://colab.research.google.com/drive/1mp3B0_UCkL5YzPVZl1Qti065ozICbnmN
     - An end-to-end inference demo: https://colab.research.google.com/drive/1jxTqcUmq-UO-NioZTZ43JBCb0UOk7gPR#scrollTo=23374c2d-0b01-496c-8171-3abf13dc77d4
