@@ -12,7 +12,7 @@ import rasterio
 from ipyleaflet import GeoJSON
 from IPython.display import display, HTML
 from rasterio.transform import rowcol
-from shapely.geometry import Point 
+from shapely.geometry import Point
 import torch
 import torch.nn.functional as F
 from torchgeo.models import RCF
@@ -173,34 +173,33 @@ def granule_codes_from_bbox(lat_min, lat_max, lon_min, lon_max):
     granules = set()
     for lomin, lomax in lon_ranges:
         lat_start = int(math.ceil(lat_min / 10.0) * 10)
-        lat_end   = int(math.ceil(lat_max / 10.0) * 10)
-        lon_start = int(math.floor(lomin  / 10.0) * 10)
-        lon_end   = int(math.floor(lomax  / 10.0) * 10)
+        lat_end = int(math.ceil(lat_max / 10.0) * 10)
+        lon_start = int(math.floor(lomin / 10.0) * 10)
+        lon_end = int(math.floor(lomax / 10.0) * 10)
 
         for lat_tl in range(lat_start, lat_end + 1, 10):
             for lon_tl in range(lon_start, lon_end + 1, 10):
-                lat_hemi = 'N' if lat_tl >= 0 else 'S'
-                lon_hemi = 'E' if lon_tl >= 0 else 'W'
+                lat_hemi = "N" if lat_tl >= 0 else "S"
+                lon_hemi = "E" if lon_tl >= 0 else "W"
                 lat_str = f"{abs(lat_tl):02d}{lat_hemi}"
                 lon_str = f"{abs(lon_tl):03d}{lon_hemi}"
                 granules.add((lat_str, lon_str))
     return sorted(granules)
 
 
-def download_glad_granule(filename, layer="lossyear",
-                               version="GFC-2024-v1.12"):
+def download_glad_granule(filename, layer="lossyear", version="GFC-2024-v1.12"):
     base_url = f"https://storage.googleapis.com/earthenginepartners-hansen/{version}/"
     try:
         url = base_url + filename
-        urllib.request.urlretrieve(url, 'data/' + filename)
+        urllib.request.urlretrieve(url, "data/" + filename)
     except Exception as e:
         print(f"Failed to download {url}: {str(e)}")
-        return False 
+        return False
 
 
-def hansen_filenames_from_bbox(lat_min, lat_max, lon_min, lon_max,
-                               layer="lossyear",
-                               version="GFC-2024-v1.12"):
+def hansen_filenames_from_bbox(
+    lat_min, lat_max, lon_min, lon_max, layer="lossyear", version="GFC-2024-v1.12"
+):
     out = []
     for lat_str, lon_str in granule_codes_from_bbox(lat_min, lat_max, lon_min, lon_max):
         fname = f"Hansen_{version}_{layer}_{lat_str}_{lon_str}.tif"
@@ -352,7 +351,8 @@ def show_previews(a, b):
     href_a = a.assets["rendered_preview"].href
     href_b = b.assets["rendered_preview"].href
 
-    return display(HTML(f"""
+    return display(
+        HTML(f"""
         <div style="display: flex; gap: 5%">
             <div width="50%">
                 <h4>Window A</h4>
@@ -363,7 +363,8 @@ def show_previews(a, b):
                 <img src="{href_b}" style="max-width: 100%; max-height: 50vh" />
             </div>
         </div>
-    """))
+    """)
+    )
 
 
 ### MGRS Tile Selector
@@ -371,11 +372,13 @@ def show_previews(a, b):
 selected_grid_layer = None
 selected_tile_id = None  # Module-level variable to store selected tile
 
+
 def get_tile_id(ft):
     return ft.get("properties", {}).get("Name")
 
+
 def pick_mgrs_tile(tile_id):
-    with open('s2-grid.json') as f:
+    with open("s2-grid.json") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])
@@ -441,9 +444,11 @@ def pick_mgrs_tile(tile_id):
     if tile_id:
         select_tile(tile_id)
 
+
 def get_selected_tile_id():
     """Helper function to get the currently selected tile ID"""
     return selected_tile_id
+
 
 class RCFWithCustomMaskPooling(RCF):
     def __init__(self, *args, **kwargs):
