@@ -83,7 +83,7 @@ jobs:
         KMP_DUPLICATE_LIB_OK: TRUE
       run: |
         conda activate ftw-tutorial
-        pip install nbformat
+        pip install nbformat nbconvert
         python -c "import nbformat; print('nbformat available')"
         python -c "import jupyter; print('jupyter available')"
         echo "Testing notebook execution..."
