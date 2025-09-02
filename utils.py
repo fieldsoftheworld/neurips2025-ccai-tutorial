@@ -1,6 +1,7 @@
 import json
 import math
 import os
+import subprocess
 import urllib.request
 from datetime import datetime, timedelta
 
@@ -9,14 +10,14 @@ import leafmap
 import planetary_computer
 import pystac_client
 import rasterio
-from ipyleaflet import GeoJSON
-from IPython.display import display, HTML
-from rasterio.transform import rowcol
-from shapely.geometry import Point 
 import torch
 import torch.nn.functional as F
+from ipyleaflet import GeoJSON
+from IPython.display import HTML, display
+from mgrs import MGRS
+from rasterio.transform import rowcol
+from shapely.geometry import Point
 from torchgeo.models import RCF
-
 
 CDL_CODE_TO_NAME = {
     0: "Background",
@@ -173,34 +174,33 @@ def granule_codes_from_bbox(lat_min, lat_max, lon_min, lon_max):
     granules = set()
     for lomin, lomax in lon_ranges:
         lat_start = int(math.ceil(lat_min / 10.0) * 10)
-        lat_end   = int(math.ceil(lat_max / 10.0) * 10)
-        lon_start = int(math.floor(lomin  / 10.0) * 10)
-        lon_end   = int(math.floor(lomax  / 10.0) * 10)
+        lat_end = int(math.ceil(lat_max / 10.0) * 10)
+        lon_start = int(math.floor(lomin / 10.0) * 10)
+        lon_end = int(math.floor(lomax / 10.0) * 10)
 
         for lat_tl in range(lat_start, lat_end + 1, 10):
             for lon_tl in range(lon_start, lon_end + 1, 10):
-                lat_hemi = 'N' if lat_tl >= 0 else 'S'
-                lon_hemi = 'E' if lon_tl >= 0 else 'W'
+                lat_hemi = "N" if lat_tl >= 0 else "S"
+                lon_hemi = "E" if lon_tl >= 0 else "W"
                 lat_str = f"{abs(lat_tl):02d}{lat_hemi}"
                 lon_str = f"{abs(lon_tl):03d}{lon_hemi}"
                 granules.add((lat_str, lon_str))
     return sorted(granules)
 
 
-def download_glad_granule(filename, layer="lossyear",
-                               version="GFC-2024-v1.12"):
+def download_glad_granule(filename, layer="lossyear", version="GFC-2024-v1.12"):
     base_url = f"https://storage.googleapis.com/earthenginepartners-hansen/{version}/"
     try:
         url = base_url + filename
-        urllib.request.urlretrieve(url, 'data/' + filename)
+        urllib.request.urlretrieve(url, "data/" + filename)
     except Exception as e:
         print(f"Failed to download {url}: {str(e)}")
-        return False 
+        return False
 
 
-def hansen_filenames_from_bbox(lat_min, lat_max, lon_min, lon_max,
-                               layer="lossyear",
-                               version="GFC-2024-v1.12"):
+def hansen_filenames_from_bbox(
+    lat_min, lat_max, lon_min, lon_max, layer="lossyear", version="GFC-2024-v1.12"
+):
     out = []
     for lat_str, lon_str in granule_codes_from_bbox(lat_min, lat_max, lon_min, lon_max):
         fname = f"Hansen_{version}_{layer}_{lat_str}_{lon_str}.tif"
@@ -352,7 +352,8 @@ def show_previews(a, b):
     href_a = a.assets["rendered_preview"].href
     href_b = b.assets["rendered_preview"].href
 
-    return display(HTML(f"""
+    return display(
+        HTML(f"""
         <div style="display: flex; gap: 5%">
             <div width="50%">
                 <h4>Window A</h4>
@@ -363,7 +364,8 @@ def show_previews(a, b):
                 <img src="{href_b}" style="max-width: 100%; max-height: 50vh" />
             </div>
         </div>
-    """))
+    """)
+    )
 
 
 ### MGRS Tile Selector
@@ -371,11 +373,13 @@ def show_previews(a, b):
 selected_grid_layer = None
 selected_tile_id = None  # Module-level variable to store selected tile
 
+
 def get_tile_id(ft):
     return ft.get("properties", {}).get("Name")
 
+
 def pick_mgrs_tile(tile_id):
-    with open('s2-grid.json') as f:
+    with open("s2-grid.json") as f:
         geojson = json.load(f)
 
     features = geojson.get("features", [])
@@ -441,9 +445,11 @@ def pick_mgrs_tile(tile_id):
     if tile_id:
         select_tile(tile_id)
 
+
 def get_selected_tile_id():
     """Helper function to get the currently selected tile ID"""
     return selected_tile_id
+
 
 class RCFWithCustomMaskPooling(RCF):
     def __init__(self, *args, **kwargs):
@@ -468,6 +474,180 @@ class RCFWithCustomMaskPooling(RCF):
         x1b = torch.mean(x1b[:, mask], dim=1, keepdim=False)
         output = torch.cat((x1a, x1b), dim=0)
         return output
+
+
+def download_and_run(tile_id: str, season: str, year: int):
+    """Download the data for a given tile and run the FTW model to generate boundaries.
+
+    Args:
+        tile_id (str): The MGRS tile ID (e.g., '21LXF').
+        season (str): The growing season ('winter' or 'summer').
+        year (int): The year of interest (e.g., 2022).
+
+    Returns:
+        str: The filename of the generated boundaries file.
+    """
+    image_filename = f"ftw_input_{tile_id}_{season}_{year}.tif"
+    output_filename = f"ftw_predictions_{tile_id}_{season}_{year}.tif"
+    filtered_output_filename = f"ftw_predictions_filtered_{tile_id}_{season}_{year}.tif"
+    boundaries_filename = f"ftw_boundaries_{tile_id}_{season}_{year}.gpkg"
+
+    lat, lon = MGRS().toLatLon(
+        tile_id + "5000050000"
+    )  # This gets the center of the MGRS tile
+    tile_center = Point(lon, lat)
+
+    buffer = 0.1
+    bbox_string = f"{lon - buffer},{lat - buffer},{lon + buffer},{lat + buffer}"
+
+    if os.path.exists(boundaries_filename):
+        print(f"Boundaries file {boundaries_filename} already exists. Skipping.")
+        return {
+            "image_filename": image_filename,
+            "output_filename": output_filename,
+            "filtered_output_filename": filtered_output_filename,
+            "boundaries_filename": boundaries_filename,
+            "bbox_string": bbox_string,
+        }
+
+    start_tif = crop_calendar_files[season]["start"]
+    end_tif = crop_calendar_files[season]["end"]
+
+    start_date, end_date = get_dates_from_tifs(
+        point=tile_center,
+        start_season_tif_path=start_tif,
+        end_season_tif_path=end_tif,
+        year=year,
+        season_type=season,
+    )
+
+    win_a_start, win_a_end, win_b_start, win_b_end = calculate_window_dates(
+        start_date, end_date
+    )
+    win_a, win_b = get_best_images(
+        win_a_start, win_a_end, win_b_start, win_b_end, s2_tile_id=tile_id
+    )
+
+    subprocess.run(
+        [
+            "ftw",
+            "inference",
+            "download",
+            "--win_a",
+            win_a.id,
+            "--win_b",
+            win_b.id,
+            "--out",
+            image_filename,
+            "--overwrite",
+            "--bbox",
+            bbox_string,
+        ],
+        check=True,
+    )
+
+    subprocess.run(
+        [
+            "ftw",
+            "model",
+            "download",
+            "--type",
+            "THREE_CLASS_FULL",
+            "-o",
+            "3_Class_FULL_FTW_Pretrained.ckpt",
+        ],
+        check=True,
+    )
+
+    model_filename = "3_Class_FULL_FTW_Pretrained.ckpt"
+
+    if torch.backends.mps.is_available():
+        print("Running inference with MPS mode enabled")
+        subprocess.run(
+            [
+                "ftw",
+                "inference",
+                "run",
+                image_filename,
+                "--out",
+                output_filename,
+                "--gpu",
+                "0",
+                "--mps_mode",
+                "--model",
+                model_filename,
+                "--overwrite",
+            ],
+            check=True,
+        )
+    elif torch.cuda.is_available():
+        print("Running inference with GPU enabled")
+        subprocess.run(
+            [
+                "ftw",
+                "inference",
+                "run",
+                image_filename,
+                "--out",
+                output_filename,
+                "--gpu",
+                "0",
+                "--model",
+                model_filename,
+                "--overwrite",
+            ],
+            check=True,
+        )
+    else:
+        print("Running inference with CPU only mode")
+        subprocess.run(
+            [
+                "ftw",
+                "inference",
+                "run",
+                image_filename,
+                "--out",
+                output_filename,
+                "--model",
+                model_filename,
+                "--overwrite",
+            ],
+            check=True,
+        )
+
+    subprocess.run(
+        [
+            "ftw",
+            "inference",
+            "filter-by-lulc",
+            output_filename,
+            "--out",
+            filtered_output_filename,
+            "--overwrite",
+        ],
+        check=True,
+    )
+
+    subprocess.run(
+        [
+            "ftw",
+            "inference",
+            "polygonize",
+            filtered_output_filename,
+            "--out",
+            boundaries_filename,
+            "-f",
+        ],
+        check=True,
+    )
+
+    return {
+        "image_filename": image_filename,
+        "output_filename": output_filename,
+        "filtered_output_filename": filtered_output_filename,
+        "boundaries_filename": boundaries_filename,
+        "bbox_string": bbox_string,
+    }
 
 
 """Download crop calendar files into ./data if they don't exist."""
