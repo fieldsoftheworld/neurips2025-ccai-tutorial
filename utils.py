@@ -648,10 +648,3 @@ def download_and_run(tile_id: str, season: str, year: int):
         "boundaries_filename": boundaries_filename,
         "bbox_string": bbox_string,
     }
-
-
-"""Download crop calendar files into ./data if they don't exist."""
-crop_calendar_files = {
-    "summer": {"start": "sc_sos_3x3_v2.tiff", "end": "sc_eos_3x3_v2.tiff"},
-    "winter": {"start": "wc_sos_3x3_v2.tiff", "end": "wc_eos_3x3_v2.tiff"},
-}
